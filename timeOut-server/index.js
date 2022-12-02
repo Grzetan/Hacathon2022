@@ -45,6 +45,11 @@ app.post('/register', (req, res)=>{
         return;
     }
 
+    if(req.body.username == '' || req.body.password == '' || req.body.email == ''){
+        res.status(400).send("Some data is missing");
+        return;
+    }
+
     connection.query(`SELECT * FROM users WHERE username = '${req.body.username}' OR email = '${req.body.email}';`, (err, rows, fields) => {
         if (err){
             res.status(500).send("Internal DB error");
@@ -56,24 +61,50 @@ app.post('/register', (req, res)=>{
         }
     })
 
-    connection.query(`INSERT INTO users (username, email, password) VALUES ('${req.body.username}', '${req.body.email}', '');`, (err, rows, fields) => {
+    // Hash password
+    bcrypt.genSalt(10, (err, salt) => {
+        bcrypt.hash(req.body.password, salt, function(err, hash) {
+            connection.query(`INSERT INTO users (username, email, password) VALUES ('${req.body.username}', '${req.body.email}', '${hash}');`, (err, rows, fields) => {
+                if (err){
+                    res.status(500).send("Internal DB error");
+                    throw err
+                }
+                res.status(200).send("Successfully created an account");
+            })
+        });
+    })
+})
+
+app.post('/login', (req, res)=>{
+    if(!req.body.hasOwnProperty("login") || !req.body.hasOwnProperty("password")){
+        res.status(400).send("Request does not have enough data");
+        return;
+    }
+
+    if(req.body.login == '' || req.body.password == ''){
+        res.status(400).send("Some data is missing");
+        return;
+    }
+
+    connection.query(`SELECT * FROM users WHERE username = '${req.body.login}' OR email = '${req.body.login}';`, (err, rows, fields) => {
         if (err){
             res.status(500).send("Internal DB error");
             throw err
         }
-        res.status(200).send("Successfully created an account");
-    })
-    
-})
+        if(Object.keys(rows).length == 0){
+            res.status(400).send("Wrong login or password");
+            return;
+        }
 
-app.get('/db', (req,res) => {
-    
-    connection.query('SELECT 1 + 1 AS solution', (err, rows, fields) => {
-      if (err) throw err
-    
-      res.send('The solution is: ' + rows[0].solution)
-    })
+        bcrypt.compare(req.body.password, rows[0].password, function(err, result) {
+            if (!result) {
+                res.status(400).send("Wrong login or password");
+                return 
+            }
 
+            res.status(200).send("Successfully logged in");
+        });
+    })
 })
 
 app.listen(port, () => {
