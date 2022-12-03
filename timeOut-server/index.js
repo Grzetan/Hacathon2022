@@ -3,9 +3,10 @@ const bcrypt = require("bcrypt");
 const app = express()
 const port = 3000
 var bodyParser = require("body-parser");
+const cookieParser = require('cookie-parser')
 
 app.use(bodyParser.json());
-
+app.use(cookieParser());
 
 const mysql = require('mysql')
 const connection = mysql.createConnection({
@@ -17,10 +18,6 @@ const connection = mysql.createConnection({
 
 connection.connect()
 
-app.get('/', (req, res) => {
-  res.send('Hello World!')
-})
-
 app.get("/db_setup", (req, res) => {
     connection.query('DROP TABLE IF EXISTS users;', (err, rows, fields) => {
         if (err){
@@ -29,7 +26,7 @@ app.get("/db_setup", (req, res) => {
         }
     })
 
-    connection.query('CREATE TABLE users(username VARCHAR(255), password TEXT, email VARCHAR(255));', (err, rows, fields) => {
+    connection.query('CREATE TABLE users(id INT PRIMARY KEY AUTO_INCREMENT, username VARCHAR(255), password TEXT, email VARCHAR(255));', (err, rows, fields) => {
         if (err){
             res.status(500).send("Internal DB error");
             throw err
@@ -101,12 +98,21 @@ app.post('/login', (req, res)=>{
                 res.status(400).send("Wrong login or password");
                 return 
             }
-
+            res.cookie("userId", rows[0].id);
             res.status(200).send("Successfully logged in");
         });
     })
 })
 
+app.get("/logout", (req, res) => {
+    res.cookie('userId', '');
+    res.end();
+});
+
+app.get("/", (req, res) => {
+    console.log(req.cookies);
+});
+
 app.listen(port, () => {
- console.log("XD");
+    console.log("Listening on port " + port);
 });
